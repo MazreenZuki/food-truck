@@ -5,6 +5,7 @@ import 'package:form_builder_validators/form_builder_validators.dart';
 import '../db/database_helper.dart';
 import 'EditUser.dart';
 import 'admin_login.dart';
+import 'admin_manage_package.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   @override
@@ -59,22 +60,22 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   // Show a confirmation dialog for deletion
   Future<bool> _showDeleteConfirmationDialog(String itemType) async {
     return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Delete $itemType'),
-        content: Text('Are you sure you want to delete this $itemType?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel'),
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Delete $itemType'),
+            content: Text('Are you sure you want to delete this $itemType?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text('Delete'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('Delete'),
-          ),
-        ],
-      ),
-    ) ??
+        ) ??
         false;
   }
 
@@ -83,23 +84,28 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => AdminLoginPage()),
-          (route) => false,
+      (route) => false,
     );
   }
 
-  void _showEditBookingDialog(BuildContext context, Map<String, dynamic> booking) {
+  void _showEditBookingDialog(
+      BuildContext context, Map<String, dynamic> booking) {
     final _fbKey = GlobalKey<FormBuilderState>();
 
     // Initialize controllers
-    final _foodTruckTypeController = TextEditingController(text: booking['foodtrucktype']);
-    final _eventTimeController = TextEditingController(text: booking['eventtime']);
-    final _priceController = TextEditingController(text: booking['price'].toString());
+    final _foodTruckTypeController =
+        TextEditingController(text: booking['foodtrucktype']);
+    final _eventTimeController =
+        TextEditingController(text: booking['eventtime']);
+    final _priceController =
+        TextEditingController(text: booking['price'].toString());
 
     // Initial values for date pickers
     DateTime? _bookingDate = DateTime.tryParse(booking['book_date']);
     DateTimeRange? _eventDateRange = DateTimeRange(
       start: DateTime.parse(booking['eventdate']),
-      end: DateTime.parse(booking['eventdate']).add(Duration(days: booking['numberofdays'] - 1)),
+      end: DateTime.parse(booking['eventdate'])
+          .add(Duration(days: booking['numberofdays'] - 1)),
     );
 
     showDialog(
@@ -126,7 +132,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     onChanged: (val) {
                       _bookingDate = val;
                     },
-                    validator: FormBuilderValidators.required(errorText: 'Please select a booking date and time'),
+                    validator: FormBuilderValidators.required(
+                        errorText: 'Please select a booking date and time'),
                   ),
                   SizedBox(height: 16),
 
@@ -156,7 +163,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             '${DateFormat('yyyy-MM-dd').format(dateRange.start)} - ${DateFormat('yyyy-MM-dd').format(dateRange.end)}');
                       }
                     },
-                    validator: FormBuilderValidators.required(errorText: 'Please select an event date range'),
+                    validator: FormBuilderValidators.required(
+                        errorText: 'Please select an event date range'),
                   ),
                   SizedBox(height: 16),
 
@@ -169,7 +177,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     ),
                     validator: FormBuilderValidators.compose([
                       FormBuilderValidators.required(),
-                          (value) {
+                      (value) {
                         final regex = RegExp(r'^\d{2}:\d{2} - \d{2}:\d{2}$');
                         if (value == null || !regex.hasMatch(value)) {
                           return 'Please enter a valid time range (e.g., 10:00 - 14:00)';
@@ -185,7 +193,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     name: 'food_truck_type',
                     controller: _foodTruckTypeController,
                     decoration: InputDecoration(labelText: 'Food Truck Type'),
-                    validator: FormBuilderValidators.required(errorText: 'Please enter the food truck type'),
+                    validator: FormBuilderValidators.required(
+                        errorText: 'Please enter the food truck type'),
                   ),
                   SizedBox(height: 16),
 
@@ -196,8 +205,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     decoration: InputDecoration(labelText: 'Price'),
                     keyboardType: TextInputType.number,
                     validator: FormBuilderValidators.compose([
-                      FormBuilderValidators.required(errorText: 'Please enter the price'),
-                      FormBuilderValidators.numeric(errorText: 'Please enter a valid number')
+                      FormBuilderValidators.required(
+                          errorText: 'Please enter the price'),
+                      FormBuilderValidators.numeric(
+                          errorText: 'Please enter a valid number')
                     ]),
                   ),
                 ],
@@ -219,13 +230,20 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 if (_fbKey.currentState!.validate()) {
                   // Prepare updated booking data
                   final updatedBooking = {
-                    'book_date': _bookingDate != null ? DateFormat('yyyy-MM-dd').format(_bookingDate!) : '',
-                    'booktime': _bookingDate != null ? DateFormat('HH:mm:ss').format(_bookingDate!) : '',
+                    'book_date': _bookingDate != null
+                        ? DateFormat('yyyy-MM-dd').format(_bookingDate!)
+                        : '',
+                    'booktime': _bookingDate != null
+                        ? DateFormat('HH:mm:ss').format(_bookingDate!)
+                        : '',
                     'eventdate': _eventDateRange?.start.toIso8601String(),
                     'eventtime': _eventTimeController.text.trim(),
                     'foodtrucktype': _foodTruckTypeController.text.trim(),
                     'numberofdays': _eventDateRange != null
-                        ? _eventDateRange!.end.difference(_eventDateRange!.start).inDays + 1
+                        ? _eventDateRange!.end
+                                .difference(_eventDateRange!.start)
+                                .inDays +
+                            1
                         : 0,
                     'price': double.parse(_priceController.text.trim()),
                   };
@@ -274,6 +292,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ),
           actions: [
             IconButton(
+              icon: Icon(Icons.local_shipping), // food truck icon
+              tooltip: 'Manage Food Truck Packages',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => AdminManagePackage()),
+                );
+              },
+            ),
+            IconButton(
               icon: Icon(Icons.logout),
               onPressed: _logout,
               tooltip: 'Logout',
@@ -298,50 +326,51 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return _users.isEmpty
         ? Center(child: Text('No registered users found.'))
         : ListView.builder(
-      itemCount: _users.length,
-      itemBuilder: (context, index) {
-        final user = _users[index];
-        return Card(
-          margin: EdgeInsets.all(8.0),
-          child: ListTile(
-            title: Text('Name: ${user['name']}'),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('UserID: ${user['userid']}'),
-                Text('Email: ${user['email']}'),
-                Text('Phone: ${user['phone']}'),
-              ],
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: Icon(Icons.edit),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => EditUserPage(
-                          user: user, // Pass user data to edit
-                          onUpdate: _loadUsers, // Callback to refresh users list
-                        ),
+            itemCount: _users.length,
+            itemBuilder: (context, index) {
+              final user = _users[index];
+              return Card(
+                margin: EdgeInsets.all(8.0),
+                child: ListTile(
+                  title: Text('Name: ${user['name']}'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('UserID: ${user['userid']}'),
+                      Text('Email: ${user['email']}'),
+                      Text('Phone: ${user['phone']}'),
+                    ],
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.edit),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => EditUserPage(
+                                user: user, // Pass user data to edit
+                                onUpdate:
+                                    _loadUsers, // Callback to refresh users list
+                              ),
+                            ),
+                          );
+                        },
+                        tooltip: 'Edit User',
                       ),
-                    );
-                  },
-                  tooltip: 'Edit User',
+                      IconButton(
+                        icon: Icon(Icons.delete),
+                        onPressed: () => _deleteUser(user['userid']),
+                        tooltip: 'Delete User',
+                      ),
+                    ],
+                  ),
                 ),
-                IconButton(
-                  icon: Icon(Icons.delete),
-                  onPressed: () => _deleteUser(user['userid']),
-                  tooltip: 'Delete User',
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+              );
+            },
+          );
   }
 
   // Build the Bookings Tab
@@ -349,48 +378,49 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return _bookings.isEmpty
         ? Center(child: Text('No bookings found.'))
         : ListView.builder(
-      itemCount: _bookings.length,
-      itemBuilder: (context, index) {
-        final booking = _bookings[index];
-        return Card(
-          margin: EdgeInsets.all(8.0),
-          child: ListTile(
-            title: Text('Booking ID: ${booking['bookid']}'),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('UserID: ${booking['userid']}'),
-                Text('Food Truck: ${booking['foodtrucktype']}'),
-                Text('Booking Date: ${booking['book_date']}'),
-                Text('Booking Time: ${booking['booktime']}'),
-                Text('Event Date/Time: ${booking['eventdate']} ${booking['eventtime']}'),
-                Text('Price: RM${NumberFormat('###0.00').format(booking['price'])}'),
-              ],
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Edit button
-                IconButton(
-                  icon: Icon(Icons.edit),
-                  onPressed: () {
-                    _showEditBookingDialog(context, booking);
-                  },
-                  tooltip: 'Edit Booking',
-                ),
+            itemCount: _bookings.length,
+            itemBuilder: (context, index) {
+              final booking = _bookings[index];
+              return Card(
+                margin: EdgeInsets.all(8.0),
+                child: ListTile(
+                  title: Text('Booking ID: ${booking['bookid']}'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('UserID: ${booking['userid']}'),
+                      Text('Food Truck: ${booking['foodtrucktype']}'),
+                      Text('Booking Date: ${booking['book_date']}'),
+                      Text('Booking Time: ${booking['booktime']}'),
+                      Text(
+                          'Event Date/Time: ${booking['eventdate']} ${booking['eventtime']}'),
+                      Text(
+                          'Price: RM${NumberFormat('###0.00').format(booking['price'])}'),
+                    ],
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Edit button
+                      IconButton(
+                        icon: Icon(Icons.edit),
+                        onPressed: () {
+                          _showEditBookingDialog(context, booking);
+                        },
+                        tooltip: 'Edit Booking',
+                      ),
 
-                // Delete button
-                IconButton(
-                  icon: Icon(Icons.delete),
-                  onPressed: () => _deleteBooking(booking['bookid']),
-                  tooltip: 'Delete Booking',
+                      // Delete button
+                      IconButton(
+                        icon: Icon(Icons.delete),
+                        onPressed: () => _deleteBooking(booking['bookid']),
+                        tooltip: 'Delete Booking',
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+              );
+            },
+          );
   }
-
 }

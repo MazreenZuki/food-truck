@@ -5,7 +5,6 @@ import 'FoodTruck/Forma/FormaDat/_FormaPDat.dart';
 import 'User/userProv.dart';
 import 'Home.dart';
 
-
 void main() {
   runApp(
     MultiProvider(

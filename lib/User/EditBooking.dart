@@ -649,23 +649,6 @@ class _EditBookingPageState extends State<EditBookingPage> {
                 ),
               ),
               SizedBox(height: 10),
-              // DEBUG BUTTON
-              ElevatedButton(
-                onPressed: () async {
-                  print("=== DEBUG: Testing direct package insertion...");
-                  await DatabaseHelper.instance.addBookingPackage({
-                    'booking_id': widget.booking['bookid'],
-                    'food_truck': 'Burger Truck',
-                    'package_name': 'Standard (50 pax)',
-                    'price': 500.0,
-                    'quantity': 1,
-                  });
-                  print("=== DEBUG: Package inserted, reloading...");
-                  await _loadBookingPackages();
-                },
-                child: Text('TEST: Add Sample Package'),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-              ),
             ],
           )
         else

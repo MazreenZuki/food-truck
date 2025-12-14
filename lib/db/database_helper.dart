@@ -21,11 +21,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-<<<<<<< Updated upstream
-      version: 1,
-=======
       version: 3, // UPGRADED VERSION
->>>>>>> Stashed changes
       onCreate: _createDB,
     );
   }
@@ -68,12 +64,6 @@ class DatabaseHelper {
         password TEXT NOT NULL
       )
     ''');
-<<<<<<< Updated upstream
-  }
-
-//============================================================
-//============================================================
-=======
 
     // NEW: Food Truck Table
     await db.execute('''
@@ -100,32 +90,6 @@ class DatabaseHelper {
   //============================================================
   //                  DATABASE UPGRADE HANDLER
   //============================================================
-  Future<void> _upgradeDB(Database db, int oldV, int newV) async {
-    if (oldV < 2) {
-      await db.execute('''
-        CREATE TABLE foodtrucks (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          image TEXT
-        )
-      ''');
-    }
-
-    if (oldV < 3) {
-      await db.execute('''
-    CREATE TABLE booking_packages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      booking_id INTEGER NOT NULL,
-      food_truck TEXT NOT NULL,
-      package_name TEXT NOT NULL,
-      price REAL NOT NULL,
-      quantity INTEGER NOT NULL DEFAULT 1
-    )
-  ''');
-    }
-  }
->>>>>>> Stashed changes
-
 
   // Function to register a new user
   Future<int> registerUser(Map<String, dynamic> user) async {
@@ -150,7 +114,8 @@ class DatabaseHelper {
   //============================================================
 
   // Function to login a user
-  Future<Map<String, dynamic>?> loginUser(String username, String password) async {
+  Future<Map<String, dynamic>?> loginUser(
+      String username, String password) async {
     final db = await instance.database;
 
     // Query the database for matching username and password
@@ -169,14 +134,6 @@ class DatabaseHelper {
 
   //============================================================
 
-  // Function to add booking
-  Future<int> addBooking(Map<String, dynamic> booking) async {
-    final db = await instance.database;
-    return await db.insert('truckbook', booking);
-  }
-
-  //============================================================
-
   // Get user profile by user ID
   Future<Map<String, dynamic>?> getUserInfo(int userId) async {
     final db = await instance.database;
@@ -191,7 +148,8 @@ class DatabaseHelper {
   //============================================================
 
   // Update user profile
-  Future<int> updateUserInfo(int userId, Map<String, dynamic> updatedValues) async {
+  Future<int> updateUserInfo(
+      int userId, Map<String, dynamic> updatedValues) async {
     final db = await instance.database;
     return await db.update(
       'users',
@@ -201,11 +159,7 @@ class DatabaseHelper {
     );
   }
 
-  //============================================================
-
-<<<<<<< Updated upstream
-  // Get bookings for a user
-=======
+  //===========================================================
   Future<int> addBooking(Map<String, dynamic> booking) async {
     final db = await instance.database;
     return await db.insert('truckbook', booking);
@@ -228,7 +182,6 @@ class DatabaseHelper {
     }
   }
 
->>>>>>> Stashed changes
   Future<List<Map<String, dynamic>>> getBookings(int userId) async {
     final db = await instance.database;
     return await db.query(
@@ -238,12 +191,6 @@ class DatabaseHelper {
     );
   }
 
-<<<<<<< Updated upstream
-  //============================================================
-
-  // Update booking
-  Future<int> updateBooking(int bookingId, Map<String, dynamic> updatedBooking) async {
-=======
   Future<Map<String, dynamic>?> getBookingById(int bookingId) async {
     final db = await instance.database;
     final result = await db.query(
@@ -340,7 +287,6 @@ class DatabaseHelper {
 
   Future<int> updateBooking(
       int bookingId, Map<String, dynamic> updatedBooking) async {
->>>>>>> Stashed changes
     final db = await instance.database;
     return await db.update(
       'truckbook',
@@ -378,15 +324,21 @@ class DatabaseHelper {
 
     // Insert admin credentials (username and password)
     await db.insert(
-      'administrator', { 'username': 'admin', 'password': 'admin123', },
-      conflictAlgorithm: ConflictAlgorithm.replace, // In case the admin already exists
+      'administrator',
+      {
+        'username': 'admin',
+        'password': 'admin123',
+      },
+      conflictAlgorithm:
+          ConflictAlgorithm.replace, // In case the admin already exists
     );
   }
 
   //============================================================
 
   // Method to check admin login (for validation in the login function)
-  Future<Map<String, dynamic>?> loginAdmin(String username, String password) async {
+  Future<Map<String, dynamic>?> loginAdmin(
+      String username, String password) async {
     final db = await instance.database;
 
     // Query to find the admin by username and password
@@ -454,7 +406,8 @@ class DatabaseHelper {
   //============================================================
 
   // Update user details
-  Future<int> adminUpdateUser(int userId, Map<String, dynamic> updatedValues) async {
+  Future<int> adminUpdateUser(
+      int userId, Map<String, dynamic> updatedValues) async {
     final db = await instance.database;
 
     return await db.update(
@@ -464,7 +417,6 @@ class DatabaseHelper {
       whereArgs: [userId],
     );
   }
-
 
   Future<void> close() async {
     final db = await instance.database;

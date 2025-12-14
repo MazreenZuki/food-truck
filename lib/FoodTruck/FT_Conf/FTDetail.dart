@@ -15,8 +15,8 @@ class FTDetailState extends State<FTDetail> {
   String? selFTPax;
 
   List<String> getPax() {
-    for(var traki in FTDat().ft) {
-      if(traki.fTrak == widget.cat) {
+    for (var traki in FTDat().ft) {
+      if (traki.fTrak == widget.cat) {
         return traki.pax.keys.toList();
       }
     }
@@ -24,8 +24,8 @@ class FTDetailState extends State<FTDetail> {
   }
 
   List<LMItm> gMnItm(String paxName) {
-    for(var traki in FTDat().ft) {
-      if(traki.fTrak == widget.cat) {
+    for (var traki in FTDat().ft) {
+      if (traki.fTrak == widget.cat) {
         return traki.pax[paxName] ?? [];
       }
     }
@@ -33,12 +33,12 @@ class FTDetailState extends State<FTDetail> {
   }
 
   double gSelPaxProis(String putPax) {
-    for(var traki in FTDat().ft) {
-      if(traki.fTrak == widget.cat){
+    for (var traki in FTDat().ft) {
+      if (traki.fTrak == widget.cat) {
         return traki.gProisPax(putPax);
       }
     }
-      return 0;
+    return 0;
   }
 
   @override
@@ -72,12 +72,18 @@ class FTDetailState extends State<FTDetail> {
                       height: 90,
                       decoration: BoxDecoration(
                         border: Border.all(
-                          color: selFTPax == paxName ? Colors.purpleAccent : Colors.grey,
+                          color: selFTPax == paxName
+                              ? Colors.purpleAccent
+                              : Colors.grey,
                           width: 2,
                         ),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Center(child: Text(paxName, textAlign: TextAlign.center,)),
+                      child: Center(
+                          child: Text(
+                        paxName,
+                        textAlign: TextAlign.center,
+                      )),
                     ),
                     SizedBox(height: 8),
                     Text(
@@ -92,7 +98,10 @@ class FTDetailState extends State<FTDetail> {
             }).toList(),
           ),
           SizedBox(height: 32),
-          Text('Menu List', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),),
+          Text(
+            'Menu List',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+          ),
           SizedBox(height: 10),
           Expanded(
             child: ListView.builder(
@@ -100,7 +109,8 @@ class FTDetailState extends State<FTDetail> {
               itemBuilder: (ctx, idx) {
                 final mn = gMnItm(selFTPax ?? '')[idx];
                 return ListTile(
-                  leading: Image.asset("assets/${mn.img}", width: 50, height: 50),
+                  leading:
+                      Image.asset("assets/${mn.img}", width: 50, height: 50),
                   title: Text(mn.title),
                   subtitle: Text(mn.desc),
                 );
@@ -122,18 +132,19 @@ class FTDetailState extends State<FTDetail> {
                 ),
                 minimumSize: Size.fromHeight(48),
               ),
-              onPressed: selFTPax == null || Provider.of<FTPDat>(context, listen: false).isFTSel(widget.cat)
+              onPressed: selFTPax == null ||
+                      Provider.of<FTPDat>(context, listen: false)
+                          .isFTSel(widget.cat)
                   ? null
                   : () {
-                final ft = widget.cat;
-                final pax = selFTPax;
-                final prois = gSelPaxProis(pax!);
-                Navigator.pop(context, {
-                  'ft': ft,
-                  'pax': pax,
-                  'prois': prois
-                });
-              },
+                      final ft = widget.cat;
+                      final pax = selFTPax;
+                      final prois = gSelPaxProis(pax!);
+                      print(
+                          "DEBUG: Adding package -> ft: $ft, pax: $pax, prois: $prois");
+                      Navigator.pop(
+                          context, {'ft': ft, 'pax': pax, 'prois': prois});
+                    },
               child: Text(
                 'Add Package',
                 style: TextStyle(color: Colors.white, fontSize: 18),

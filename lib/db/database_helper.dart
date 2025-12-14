@@ -21,7 +21,11 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
+<<<<<<< Updated upstream
       version: 1,
+=======
+      version: 3, // UPGRADED VERSION
+>>>>>>> Stashed changes
       onCreate: _createDB,
     );
   }
@@ -64,10 +68,63 @@ class DatabaseHelper {
         password TEXT NOT NULL
       )
     ''');
+<<<<<<< Updated upstream
   }
 
 //============================================================
 //============================================================
+=======
+
+    // NEW: Food Truck Table
+    await db.execute('''
+      CREATE TABLE foodtrucks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        image TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE booking_packages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        booking_id INTEGER NOT NULL,
+        food_truck TEXT NOT NULL,
+        package_name TEXT NOT NULL,
+        price REAL NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 1,
+        FOREIGN KEY (booking_id) REFERENCES truckbook (bookid)
+      )
+      ''');
+  }
+
+  //============================================================
+  //                  DATABASE UPGRADE HANDLER
+  //============================================================
+  Future<void> _upgradeDB(Database db, int oldV, int newV) async {
+    if (oldV < 2) {
+      await db.execute('''
+        CREATE TABLE foodtrucks (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          image TEXT
+        )
+      ''');
+    }
+
+    if (oldV < 3) {
+      await db.execute('''
+    CREATE TABLE booking_packages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      booking_id INTEGER NOT NULL,
+      food_truck TEXT NOT NULL,
+      package_name TEXT NOT NULL,
+      price REAL NOT NULL,
+      quantity INTEGER NOT NULL DEFAULT 1
+    )
+  ''');
+    }
+  }
+>>>>>>> Stashed changes
 
 
   // Function to register a new user
@@ -146,7 +203,32 @@ class DatabaseHelper {
 
   //============================================================
 
+<<<<<<< Updated upstream
   // Get bookings for a user
+=======
+  Future<int> addBooking(Map<String, dynamic> booking) async {
+    final db = await instance.database;
+    return await db.insert('truckbook', booking);
+  }
+
+  // save booking packages
+  Future<int> addBookingPackage(Map<String, dynamic> data) async {
+    final db = await instance.database;
+    try {
+      int id = await db.insert(
+        'booking_packages',
+        data,
+        conflictAlgorithm: ConflictAlgorithm.replace, // avoid duplicates
+      );
+      print("DEBUG: Booking package inserted with id: $id");
+      return id;
+    } catch (e) {
+      print("ERROR in addBookingPackage: $e");
+      return 0;
+    }
+  }
+
+>>>>>>> Stashed changes
   Future<List<Map<String, dynamic>>> getBookings(int userId) async {
     final db = await instance.database;
     return await db.query(
@@ -156,10 +238,109 @@ class DatabaseHelper {
     );
   }
 
+<<<<<<< Updated upstream
   //============================================================
 
   // Update booking
   Future<int> updateBooking(int bookingId, Map<String, dynamic> updatedBooking) async {
+=======
+  Future<Map<String, dynamic>?> getBookingById(int bookingId) async {
+    final db = await instance.database;
+    final result = await db.query(
+      'truckbook',
+      where: 'bookid = ?',
+      whereArgs: [bookingId],
+    );
+    return result.isNotEmpty ? result.first : null;
+  }
+
+  Future<List<Map<String, dynamic>>> getBookingPackages(int bookingId) async {
+    final db = await instance.database;
+
+    print("Fetching packages for booking ID: $bookingId"); // debug
+
+    final result = await db.query(
+      'booking_packages',
+      where: 'booking_id = ?',
+      whereArgs: [bookingId],
+    );
+
+    print("Packages fetched from DB: $result"); // debug
+
+    return result;
+  }
+
+  // get a specific package
+  Future<Map<String, dynamic>?> getBookingPackage(
+      int bookingId, String foodTruck, String packageName) async {
+    final db = await instance.database;
+    final result = await db.query(
+      'booking_packages',
+      where: 'booking_id = ? AND food_truck = ? AND package_name = ?',
+      whereArgs: [bookingId, foodTruck, packageName],
+      limit: 1,
+    );
+    return result.isNotEmpty ? result.first : null;
+  }
+
+// Update the updateBookingPackage to be more robust
+  Future<int> updateBookingPackage(
+      int bookingId, String foodTruck, String packageName, int quantity,
+      [double? price]) async {
+    // Make price optional
+    final db = await instance.database;
+
+    final existing = await db.query(
+      'booking_packages',
+      where: 'booking_id = ? AND food_truck = ? AND package_name = ?',
+      whereArgs: [bookingId, foodTruck, packageName],
+    );
+
+    if (existing.isNotEmpty) {
+      // Update quantity
+      return await db.update(
+        'booking_packages',
+        {'quantity': quantity},
+        where: 'booking_id = ? AND food_truck = ? AND package_name = ?',
+        whereArgs: [bookingId, foodTruck, packageName],
+      );
+    } else if (price != null) {
+      // Insert new with all data
+      return await db.insert('booking_packages', {
+        'booking_id': bookingId,
+        'food_truck': foodTruck,
+        'package_name': packageName,
+        'price': price,
+        'quantity': quantity,
+      });
+    } else {
+      print("ERROR: Cannot insert package without price");
+      return 0;
+    }
+  }
+
+  Future<int> deleteAllBookingPackages(int bookingId) async {
+    final db = await instance.database;
+    return await db.delete(
+      'booking_packages',
+      where: 'booking_id = ?',
+      whereArgs: [bookingId],
+    );
+  }
+
+  Future<int> deleteBookingPackage(
+      int bookingId, String foodTruck, String packageName) async {
+    final db = await instance.database;
+    return await db.delete(
+      'booking_packages',
+      where: 'booking_id = ? AND food_truck = ? AND package_name = ?',
+      whereArgs: [bookingId, foodTruck, packageName],
+    );
+  }
+
+  Future<int> updateBooking(
+      int bookingId, Map<String, dynamic> updatedBooking) async {
+>>>>>>> Stashed changes
     final db = await instance.database;
     return await db.update(
       'truckbook',

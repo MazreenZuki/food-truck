@@ -96,9 +96,9 @@ class FTSelectState extends State<FTSelect> {
                     ),
                   );
                   if (res != null) {
-                    setState(() {
-                      ftPDat.addPax(res);
-                    });
+                    print("DEBUG: Before addPax -> selPax: ${ftPDat.selPax}");
+                    ftPDat.addPax(res);
+                    print("DEBUG: After addPax -> selPax: ${ftPDat.selPax}");
                   }
                 },
                 child: Card(

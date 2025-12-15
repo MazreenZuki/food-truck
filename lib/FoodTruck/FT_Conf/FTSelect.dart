@@ -2,10 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../FT_Conf/FTDetail.dart';
 import '../Forma/FormaDat/_FTPDat.dart';
-// Centralized Data
 
 class FTSelect extends StatefulWidget {
-  const FTSelect({Key? k}) : super(key: k);
+  final bool isEditMode;
+  final VoidCallback? onUpdateComplete; // Callback for edit mode
+
+  const FTSelect({
+    Key? k,
+    this.isEditMode = false,
+    this.onUpdateComplete,
+  }) : super(key: k);
 
   @override
   FTSelectState createState() => FTSelectState();
@@ -26,6 +32,60 @@ class FTSelectState extends State<FTSelect> {
     return ftPDat.hasPax();
   }
 
+  void _handleSelection(BuildContext context, String foodTruckName) async {
+    final ftPDat = Provider.of<FTPDat>(context, listen: false);
+
+    // In edit mode, allow re-selecting already selected trucks
+    if (!widget.isEditMode && ftPDat.isFTSel(foodTruckName)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$foodTruckName has already been selected.'),
+          duration: Duration(seconds: 2),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final res = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) => FTDetail(
+          cat: foodTruckName,
+        ),
+      ),
+    );
+
+    if (res != null) {
+      print("DEBUG: Before addPax -> selPax: ${ftPDat.selPax}");
+      ftPDat.addPax(res);
+      print("DEBUG: After addPax -> selPax: ${ftPDat.selPax}");
+    }
+  }
+
+  void _handleConfirm() {
+    final ftPDat = Provider.of<FTPDat>(context, listen: false);
+
+    if (widget.isEditMode) {
+      // For edit mode, return the selected packages WITH quantities
+      Navigator.pop(context, {
+        'updated': true,
+        'packages': ftPDat.selPax
+            .map((pax) => {
+                  'ft': pax['ft'],
+                  'pax': pax['pax'],
+                  'prois': pax['prois'],
+                  'quantity':
+                      pax['quantity'] ?? 1, // Make sure quantity is included
+                })
+            .toList(),
+      });
+    } else {
+      // For booking mode, navigate to next screen
+      Navigator.pushNamed(context, '/booking-confirmation');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ftPDat = Provider.of<FTPDat>(context);
@@ -33,15 +93,32 @@ class FTSelectState extends State<FTSelect> {
     return Scaffold(
       appBar: AppBar(
         scrolledUnderElevation: 0,
-        title: const Text("Select Food Truck"),
+        title:
+            Text(widget.isEditMode ? "Update Food Truck" : "Select Food Truck"),
+        leading: widget.isEditMode
+            ? IconButton(
+                icon: Icon(Icons.arrow_back),
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+              )
+            : null,
         actions: [
+          if (widget.isEditMode && ftPDat.hasPax())
+            TextButton(
+              onPressed: _handleConfirm,
+              child: Text(
+                "Update",
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
           InkWell(
             splashFactory: NoSplash.splashFactory,
             highlightColor: Colors.transparent,
             hoverColor: Colors.transparent,
             onTap: () {
               setState(() {
-                visSht = !visSht; // Toggle visibility
+                visSht = !visSht;
               });
             },
             child: Padding(
@@ -65,6 +142,7 @@ class FTSelectState extends State<FTSelect> {
       body: Stack(
         children: [
           GridView.builder(
+            padding: EdgeInsets.all(16),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               mainAxisSpacing: 16,
@@ -76,52 +154,55 @@ class FTSelectState extends State<FTSelect> {
               final isSel = ftPDat.isFTSel(cat['name']!);
 
               return GestureDetector(
-                onTap: () async {
-                  if (Provider.of<FTPDat>(context, listen: false)
-                      .isFTSel(cat['name']!)) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content:
-                            Text('${cat['name']} has already been selected.'),
-                        duration: Duration(seconds: 2),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                    return;
-                  }
-                  final res = await Navigator.push(
-                    ctx,
-                    MaterialPageRoute(
-                      builder: (ctx) => FTDetail(cat: cat['name']!),
-                    ),
-                  );
-                  if (res != null) {
-                    print("DEBUG: Before addPax -> selPax: ${ftPDat.selPax}");
-                    ftPDat.addPax(res);
-                    print("DEBUG: After addPax -> selPax: ${ftPDat.selPax}");
-                  }
-                },
+                onTap: () => _handleSelection(context, cat['name']!),
                 child: Card(
-                  color: isSel ? Colors.white54 : Colors.white,
+                  color: isSel ? Colors.purple.withOpacity(0.1) : Colors.white,
                   elevation: 3,
-                  clipBehavior:
-                      Clip.antiAlias, // Clip the image within the card
+                  clipBehavior: Clip.antiAlias,
                   child: Stack(
                     children: [
-                      Image.asset(cat['img']!,
-                          width: double.infinity,
-                          height: 120.0,
-                          fit: BoxFit.cover),
+                      Image.asset(
+                        cat['img']!,
+                        width: double.infinity,
+                        height: 120.0,
+                        fit: BoxFit.cover,
+                      ),
                       Positioned(
                         bottom: 10.0,
                         left: 10,
                         right: 10,
-                        child: Text(
-                          cat['name']!,
-                          style: TextStyle(fontSize: 14),
-                          textAlign: TextAlign.center, // Adjust text color
+                        child: Container(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            cat['name']!,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
+                      if (isSel && !widget.isEditMode)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            padding: EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.green,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(Icons.check,
+                                size: 16, color: Colors.white),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -161,8 +242,10 @@ class FTSelectState extends State<FTSelect> {
                         ),
                       ),
                       SliverAppBar(
-                        title: const Text(
-                          'Selected Packages',
+                        title: Text(
+                          widget.isEditMode
+                              ? 'Updated Packages'
+                              : 'Selected Packages',
                           style: TextStyle(color: Colors.black87, fontSize: 18),
                         ),
                         backgroundColor: Colors.white,
@@ -221,9 +304,29 @@ class FTSelectState extends State<FTSelect> {
                           hasScrollBody: false,
                           child: Center(
                             child: Text(
-                              'No food truck packages selected yet.',
+                              widget.isEditMode
+                                  ? 'No packages updated yet.'
+                                  : 'No food truck packages selected yet.',
                               style: TextStyle(
                                   fontSize: 16, color: Colors.grey[600]),
+                            ),
+                          ),
+                        ),
+                      if (widget.isEditMode && ftPDat.hasPax())
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: ElevatedButton(
+                              onPressed: _handleConfirm,
+                              style: ElevatedButton.styleFrom(
+                                minimumSize: Size(double.infinity, 50),
+                                backgroundColor: Colors.purpleAccent,
+                              ),
+                              child: Text(
+                                'Confirm Update',
+                                style: TextStyle(
+                                    fontSize: 16, color: Colors.white),
+                              ),
                             ),
                           ),
                         ),
@@ -234,6 +337,15 @@ class FTSelectState extends State<FTSelect> {
             ),
         ],
       ),
+      // Add floating action button for booking mode
+      floatingActionButton: !widget.isEditMode && ftPDat.hasPax()
+          ? FloatingActionButton.extended(
+              onPressed: _handleConfirm,
+              backgroundColor: Colors.purpleAccent,
+              icon: Icon(Icons.arrow_forward),
+              label: Text('Continue'),
+            )
+          : null,
     );
   }
 }

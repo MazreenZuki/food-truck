@@ -1,7 +1,9 @@
+import 'package:fdb/FoodTruck/Forma/FormaDat/_FTPDat.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../FoodTruck/FT_Conf/FTSelect.dart';
 import '../db/database_helper.dart';
 
@@ -174,29 +176,68 @@ class _EditBookingPageState extends State<EditBookingPage> {
   }
 
   void _openPackageSelectionDialog() async {
-    // naviagte to FTSelect page
-    final selectedPackages = await Navigator.push(
+    final ftPDat = Provider.of<FTPDat>(context, listen: false);
+
+    // Clear existing selection
+    ftPDat.clrPax();
+
+    // Pre-load current cart items
+    for (var item in cart) {
+      ftPDat.addPax({
+        'ft': item['foodTruck'],
+        'pax': item['package'],
+        'prois': item['price'],
+        'quantity': item['quantity'], // ADD QUANTITY TOO
+      });
+    }
+
+    // Navigate to FTSelect page and wait for result
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => FTSelect(),
+        builder: (_) => FTSelect(
+          isEditMode: true,
+        ),
       ),
     );
 
-    if (selectedPackages != null && selectedPackages is List) {
-      for (var pkg in selectedPackages) {
-        // Avoid duplicates in the cart
-        final exists = cart.any(
-            (c) => c['foodTruck'] == pkg['ft'] && c['package'] == pkg['pax']);
-        if (!exists) {
-          final packageData = {
-            'foodTruck': pkg['ft'],
-            'package': pkg['pax'],
-            'price': pkg['prois'],
-            'quantity': 1,
-          };
-          _addPackageToCart(packageData);
+    // Handle the returned packages
+    if (result != null && result['updated'] == true) {
+      // SAFELY cast the packages
+      final dynamic packagesDynamic = result['packages'];
+      List<Map<String, dynamic>> packages = [];
+
+      if (packagesDynamic is List) {
+        for (var item in packagesDynamic) {
+          if (item is Map<String, dynamic>) {
+            packages.add(item);
+          } else if (item is Map) {
+            packages.add(Map<String, dynamic>.from(item));
+          }
         }
       }
+
+      print("Received ${packages.length} packages from FTSelect");
+
+      // Update local cart ONLY (no database writes yet)
+      final newCart = <Map<String, dynamic>>[];
+
+      for (var pkg in packages) {
+        newCart.add({
+          'foodTruck': pkg['ft']?.toString() ?? 'Unknown',
+          'package': pkg['pax']?.toString() ?? 'Unknown',
+          'price': (pkg['prois'] as num?)?.toDouble() ?? 0.0,
+          'quantity': (pkg['quantity'] as int?) ?? 1,
+        });
+      }
+
+      // Update cart state (local only, no DB writes)
+      setState(() {
+        cart = newCart;
+      });
+
+      print(
+          "Updated LOCAL cart with ${cart.length} items (not saved to DB yet)");
     }
   }
 

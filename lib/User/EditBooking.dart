@@ -47,11 +47,6 @@ class _EditBookingPageState extends State<EditBookingPage> {
     super.initState();
     _initEventTime();
     _loadBookingPackages();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkDatabaseStructure();
-      _testDatabaseMethodsDirectly(); // ADD THIS LINE
-    });
   }
 
   void _initEventTime() {
@@ -68,111 +63,6 @@ class _EditBookingPageState extends State<EditBookingPage> {
         _endTime = TimeOfDay(hour: 18, minute: 0);
       }
     }
-  }
-
-  void _checkDatabaseStructure() async {
-    print("\n" + "=" * 60);
-    print("=== DATABASE DIAGNOSTIC CHECK ===");
-
-    try {
-      // First, check if booking exists
-      print("1. Checking if booking ID 6 exists...");
-      final booking = await DatabaseHelper.instance.getBookingById(6);
-      print("   Booking exists: ${booking != null}");
-      if (booking != null) {
-        print("   Booking data: $booking");
-      }
-
-      // Check all booking packages table (if you have such a method)
-      print("\n2. Checking ALL booking packages...");
-      // If you have a method to get all booking packages
-      // final allPackages = await DatabaseHelper.instance.getAllBookingPackages();
-      // print("   All packages in DB: $allPackages");
-
-      // Test insert a dummy package
-      print("\n3. Testing package insertion...");
-      try {
-        await DatabaseHelper.instance.updateBookingPackage(
-          6,
-          "TEST_TRUCK",
-          "TEST_PACKAGE",
-          1,
-        );
-        print("   ✓ Test insertion successful");
-
-        // Now try to fetch it back
-        print("\n4. Fetching test package...");
-        final testFetch = await DatabaseHelper.instance.getBookingPackages(6);
-        print("   Packages after test insert: $testFetch");
-
-        // Clean up test data
-        print("\n5. Cleaning up test data...");
-        // You'll need a delete method
-        // await DatabaseHelper.instance.deleteBookingPackage(6, "TEST_TRUCK", "TEST_PACKAGE");
-      } catch (e) {
-        print("   ✗ Test insertion failed: $e");
-      }
-    } catch (e) {
-      print("Diagnostic error: $e");
-    }
-
-    print("=" * 60 + "\n");
-  }
-
-  // Add this method to your EditBookingPage
-  void _testDatabaseMethodsDirectly() async {
-    print("\n" + "=" * 60);
-    print("=== DIRECT DATABASE METHOD TEST ===");
-
-    // First, let's see what the actual SQLite database contains
-    print("1. Querying database directly with raw SQL...");
-
-    try {
-      final db = await DatabaseHelper.instance.database;
-
-      // First, check what tables exist
-      print("\n2. Checking existing tables...");
-      final tables = await db.rawQuery(
-          "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;");
-      print("   Tables in database:");
-      for (var table in tables) {
-        print("   - ${table['name']}");
-      }
-
-      // Check if booking_packages table exists
-      print("\n3. Checking booking_packages table structure...");
-      final tableInfo =
-          await db.rawQuery("PRAGMA table_info(booking_packages);");
-      if (tableInfo.isEmpty) {
-        print("   ❌ booking_packages table doesn't exist!");
-      } else {
-        print("   Columns in booking_packages:");
-        for (var column in tableInfo) {
-          print("   - ${column['name']} (${column['type']})");
-        }
-      }
-
-      // Check all data in booking_packages
-      print("\n4. Checking ALL data in booking_packages...");
-      final allData = await db.rawQuery("SELECT * FROM booking_packages;");
-      print("   Total rows in booking_packages: ${allData.length}");
-      for (var row in allData) {
-        print("   Row: $row");
-      }
-
-      // Specifically check for booking ID 6
-      print("\n5. Specifically checking for booking_id = 6...");
-      final rowsForBooking6 = await db
-          .rawQuery("SELECT * FROM booking_packages WHERE booking_id = 6;");
-      print("   Rows for booking 6: ${rowsForBooking6.length}");
-      for (var row in rowsForBooking6) {
-        print("   Row: $row");
-      }
-    } catch (e) {
-      print("Error in direct SQL test: $e");
-    }
-
-    print("=" * 60 + "\n");
   }
 
   void _openPackageSelectionDialog() async {
@@ -238,49 +128,6 @@ class _EditBookingPageState extends State<EditBookingPage> {
 
       print(
           "Updated LOCAL cart with ${cart.length} items (not saved to DB yet)");
-    }
-  }
-
-  void _addPackageToCart(Map<String, dynamic> package) async {
-    final bookingId = widget.booking['bookid'];
-
-    print("=== DEBUG: Adding package to cart:");
-    print("  Booking ID: $bookingId");
-    print("  Package: $package");
-
-    try {
-      // First check if package already exists
-      final existingPackages =
-          await DatabaseHelper.instance.getBookingPackages(bookingId);
-      final exists = existingPackages.any((p) =>
-          p['food_truck'] == package['foodTruck'] &&
-          p['package_name'] == package['package']);
-
-      if (exists) {
-        // Update quantity if exists
-        await DatabaseHelper.instance.updateBookingPackage(
-          bookingId,
-          package['foodTruck'],
-          package['package'],
-          package['quantity'],
-        );
-        print("  Package exists, updated quantity");
-      } else {
-        // INSERT NEW PACKAGE using addBookingPackage
-        await DatabaseHelper.instance.addBookingPackage({
-          'booking_id': bookingId,
-          'food_truck': package['foodTruck'],
-          'package_name': package['package'],
-          'price': package['price'],
-          'quantity': package['quantity'],
-        });
-        print("  Package inserted as new row");
-      }
-
-      // Refresh cart
-      await _loadBookingPackages();
-    } catch (e) {
-      print("=== DEBUG: Error adding package: $e");
     }
   }
 
@@ -458,39 +305,18 @@ class _EditBookingPageState extends State<EditBookingPage> {
   }
 
   void _updateQuantity(int index, bool increase) async {
-    final bookingId = widget.booking['bookid'];
     final package = cart[index];
 
     if (increase) {
       setState(() {
         cart[index]['quantity']++;
       });
-      // Use updateBookingPackage with price
-      await DatabaseHelper.instance.updateBookingPackage(
-        bookingId,
-        package['foodTruck'],
-        package['package'],
-        package['quantity'],
-        package['price'], // Pass price too
-      );
     } else {
       if (package['quantity'] > 1) {
         setState(() {
           cart[index]['quantity']--;
         });
-        await DatabaseHelper.instance.updateBookingPackage(
-          bookingId,
-          package['foodTruck'],
-          package['package'],
-          package['quantity'],
-          package['price'],
-        );
       } else {
-        await DatabaseHelper.instance.deleteBookingPackage(
-          bookingId,
-          package['foodTruck'],
-          package['package'],
-        );
         setState(() {
           cart.removeAt(index);
         });

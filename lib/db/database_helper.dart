@@ -274,57 +274,12 @@ class DatabaseHelper {
     return result.isNotEmpty ? result.first : null;
   }
 
-  Future<int> updateBookingPackage(
-      int bookingId, String foodTruck, String packageName, int quantity,
-      [double? price]) async {
-    // Make price optional
-    final db = await instance.database;
-
-    final existing = await db.query(
-      'booking_packages',
-      where: 'booking_id = ? AND food_truck = ? AND package_name = ?',
-      whereArgs: [bookingId, foodTruck, packageName],
-    );
-
-    if (existing.isNotEmpty) {
-      // Update quantity
-      return await db.update(
-        'booking_packages',
-        {'quantity': quantity},
-        where: 'booking_id = ? AND food_truck = ? AND package_name = ?',
-        whereArgs: [bookingId, foodTruck, packageName],
-      );
-    } else if (price != null) {
-      // Insert new with all data
-      return await db.insert('booking_packages', {
-        'booking_id': bookingId,
-        'food_truck': foodTruck,
-        'package_name': packageName,
-        'price': price,
-        'quantity': quantity,
-      });
-    } else {
-      print("ERROR: Cannot insert package without price");
-      return 0;
-    }
-  }
-
   Future<int> deleteAllBookingPackages(int bookingId) async {
     final db = await instance.database;
     return await db.delete(
       'booking_packages',
       where: 'booking_id = ?',
       whereArgs: [bookingId],
-    );
-  }
-
-  Future<int> deleteBookingPackage(
-      int bookingId, String foodTruck, String packageName) async {
-    final db = await instance.database;
-    return await db.delete(
-      'booking_packages',
-      where: 'booking_id = ? AND food_truck = ? AND package_name = ?',
-      whereArgs: [bookingId, foodTruck, packageName],
     );
   }
 

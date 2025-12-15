@@ -337,15 +337,6 @@ class FTSelectState extends State<FTSelect> {
             ),
         ],
       ),
-      // Add floating action button for booking mode
-      floatingActionButton: !widget.isEditMode && ftPDat.hasPax()
-          ? FloatingActionButton.extended(
-              onPressed: _handleConfirm,
-              backgroundColor: Colors.purpleAccent,
-              icon: Icon(Icons.arrow_forward),
-              label: Text('Continue'),
-            )
-          : null,
     );
   }
 }

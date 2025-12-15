@@ -17,11 +17,8 @@ class BkChkOut extends StatefulWidget {
 class BkChkOutState extends State<BkChkOut> {
   final TextEditingController dscountCtrl = TextEditingController();
   double finProis = 0.0;
-  bool _isSaving = false; // To prevent double clicks
-
-  // ====================================================================
-  //                        DISCOUNT CODE MATCHING
-  // ====================================================================
+  bool _isSaving = false;
+  bool _discountApplied = false;
 
   double dscountProis(double SelPaxProis, String? dscountKod) {
     if (dscountKod == null || dscountKod.isEmpty) {
@@ -37,10 +34,6 @@ class BkChkOutState extends State<BkChkOut> {
     }
   }
 
-  // ====================================================================
-  //DISCOUNT CODE VALIDATION
-  // ====================================================================
-
   void appDscount(double SelPaxProis) {
     String dscountKod = dscountCtrl.text.trim();
     double calcProis = dscountProis(SelPaxProis, dscountKod);
@@ -48,50 +41,48 @@ class BkChkOutState extends State<BkChkOut> {
     if (calcProis == SelPaxProis) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Invalid Discount Code'),
+          content: Text('Invalid discount code'),
           duration: Duration(seconds: 2),
           backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
         ),
       );
+      setState(() {
+        _discountApplied = false;
+      });
     } else {
       setState(() {
         finProis = calcProis;
+        _discountApplied = true;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Great Discount, Happy Booking!'),
+          content: Text('Discount applied successfully!'),
           duration: Duration(seconds: 2),
-          backgroundColor: Colors.purple,
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
   }
 
-  // ====================================================================
-  // SAVE BOOKING TO DATABASE
-  // ====================================================================
-
   Future<void> saveBooking() async {
-    if (_isSaving) return; // Prevent double click
+    if (_isSaving) return;
 
     setState(() {
       _isSaving = true;
     });
 
-    print("=== DEBUG: saveBooking() CALLED! ===");
-
-    final formaProvider = Provider.of<FormaPDat>(context, listen: false);
     final ftpProvider = Provider.of<FTPDat>(context, listen: false);
+    final formaProvider = Provider.of<FormaPDat>(context, listen: false);
     final userProvider = Provider.of<UserProvider>(context, listen: false);
 
-    print("=== DEBUG: Selected packages count: ${ftpProvider.selPax.length}");
-
     if (ftpProvider.selPax.isEmpty) {
-      print("=== DEBUG: WARNING! No packages to save!");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Please select at least one package!'),
           backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       setState(() {
@@ -100,7 +91,6 @@ class BkChkOutState extends State<BkChkOut> {
       return;
     }
 
-    // Prepare booking data
     final bookingData = {
       'userid': userProvider.userId,
       'book_date': formaProvider.booking_date != null
@@ -126,20 +116,12 @@ class BkChkOutState extends State<BkChkOut> {
     };
 
     try {
-      print("=== DEBUG: Starting database transaction...");
-
-      // Start a database transaction
       final db = await DatabaseHelper.instance.database;
       await db.transaction((txn) async {
-        // Insert booking
         final bookingId = await txn.insert('truckbook', bookingData);
-        print("=== DEBUG: Booking inserted with ID: $bookingId");
 
         if (bookingId > 0) {
-          // Save each package
           for (var pck in ftpProvider.selPax) {
-            print("=== DEBUG: Inserting package: ${pck['ft']} - ${pck['pax']}");
-
             final packageData = {
               'booking_id': bookingId,
               'food_truck': pck['ft']?.toString() ?? 'Unknown',
@@ -147,48 +129,32 @@ class BkChkOutState extends State<BkChkOut> {
               'price': (pck['prois'] ?? 0.0).toDouble(),
               'quantity': (pck['qty'] ?? 1).toInt(),
             };
-
-            print("=== DEBUG: Package data: $packageData");
-
-            final res = await txn.insert('booking_packages', packageData);
-            print("=== DEBUG: Package inserted with ID: $res");
+            await txn.insert('booking_packages', packageData);
           }
-
-          // Verify insertion
-          final packages = await txn.query(
-            'booking_packages',
-            where: 'booking_id = ?',
-            whereArgs: [bookingId],
-          );
-          print("=== DEBUG: Verification - packages count: ${packages.length}");
-          print("=== DEBUG: Packages: $packages");
         }
       });
-
-      print("=== DEBUG: Booking saved successfully!");
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Booking saved successfully!'),
           backgroundColor: Colors.green,
           duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
         ),
       );
 
       if (widget.onBookingSaved != null) {
-        widget.onBookingSaved!(); // call the callback to go to rating
+        widget.onBookingSaved!();
       } else {
-        Navigator.pop(context); // fallback
+        Navigator.pop(context);
       }
     } catch (e) {
-      print('=== DEBUG: Error saving booking: $e');
-      print('=== DEBUG: Error stack trace: ${e.toString()}');
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error saving booking: $e'),
+          content: Text('Error saving booking: ${e.toString()}'),
           backgroundColor: Colors.red,
           duration: Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
         ),
       );
     } finally {
@@ -198,24 +164,98 @@ class BkChkOutState extends State<BkChkOut> {
     }
   }
 
-  // ====================================================================
+  Widget _buildInfoCard(String title, List<Widget> content) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Colors.white, Colors.grey[50]!],
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        color: Colors.blue[800],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 16),
+              ...content,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value, {bool isBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[700],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: isBold ? FontWeight.w600 : FontWeight.normal,
+                color: Colors.grey[900],
+              ),
+              textAlign: TextAlign.right,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final ftP = Provider.of<FTPDat>(context);
     final formaP = Provider.of<FormaPDat>(context);
 
-    // DEBUG: Print selected packages on build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      print("=== DEBUG BkChkOut Build:");
-      print("  Selected packages: ${ftP.selPax}");
-      print("  Package count: ${ftP.selPax.length}");
-    });
-
     double chkProis = ftP.totProis;
     double discountReduction = chkProis - (finProis > 0 ? finProis : chkProis);
+    double finalPrice = finProis > 0 ? finProis : chkProis;
 
-    // Get data from Event Info page via Provider
     DateTime? bookDate = formaP.booking_date;
     String forBookDate = bookDate != null
         ? DateFormat('dd/MM/yyyy HH:mm').format(bookDate)
@@ -232,13 +272,18 @@ class BkChkOutState extends State<BkChkOut> {
         : 'Not set';
 
     return Scaffold(
-      resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        title: Text('Booking Information'),
+        title: Text(
+          'Booking Summary',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.grey[900],
         actions: [
-          // Add save button in app bar too
           IconButton(
-            icon: Icon(Icons.save, color: Colors.white),
+            icon: Icon(Icons.save_outlined),
             onPressed: _isSaving ? null : saveBooking,
             tooltip: 'Save Booking',
           ),
@@ -248,308 +293,525 @@ class BkChkOutState extends State<BkChkOut> {
         children: [
           Expanded(
             child: SingleChildScrollView(
+              physics: BouncingScrollPhysics(),
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.all(20.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('User Details:',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 18)),
-                            SizedBox(height: 8),
-                            Text('Name: ${formaP.full_name ?? 'Not Provided'}'),
-                            Text(
-                                'Address: ${formaP.address ?? 'Not Provided'}'),
-                            Text('Phone: ${formaP.phone_no ?? 'Not Provided'}'),
-                            Text('Email: ${formaP.email ?? 'Not Provided'}'),
-                          ],
-                        ),
-                      ),
-                    ),
+                    // User Details Card
+                    _buildInfoCard('USER DETAILS', [
+                      _buildInfoRow('Name', formaP.full_name ?? 'Not provided'),
+                      _buildInfoRow(
+                          'Address', formaP.address ?? 'Not provided'),
+                      _buildInfoRow('Phone', formaP.phone_no ?? 'Not provided'),
+                      _buildInfoRow('Email', formaP.email ?? 'Not provided'),
+                    ]),
+
                     SizedBox(height: 20),
+
                     // Event Info Card
+                    _buildInfoCard('EVENT INFORMATION', [
+                      _buildInfoRow('Booking Date', forBookDate),
+                      _buildInfoRow(
+                          'Event Date', '$forStartDate - $forEndDate'),
+                      _buildInfoRow('Event Time',
+                          '${formaP.event_start_time?.format(context) ?? 'Not set'} - ${formaP.event_end_time?.format(context) ?? 'Not set'}'),
+                      _buildInfoRow('Food Truck Type',
+                          formaP.food_sell_types ?? 'Not provided'),
+                      _buildInfoRow(
+                          'Decoration Required',
+                          formaP.add_req == true
+                              ? "Yes"
+                              : (formaP.add_req == false
+                                  ? "No"
+                                  : "Not provided")),
+                    ]),
+
+                    SizedBox(height: 20),
+
+                    // Pricing Card
                     Card(
-                      elevation: 4,
+                      elevation: 2,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Colors.white, Colors.grey[50]!],
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        padding: EdgeInsets.all(20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Event Info:',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 18)),
-                            SizedBox(height: 8),
-                            Text('Booking Date: $forBookDate'),
-                            Text(
-                                'Event Start-End Date: $forStartDate - $forEndDate'),
-                            Text(
-                                'Event Start-End Time: ${formaP.event_start_time?.format(context) ?? 'Not Provided'} - ${formaP.event_end_time?.format(context) ?? 'Not Provided'}'),
-                            Text(
-                                'Food Truck Decoration: ${formaP.add_req == true ? "Yes" : (formaP.add_req == false ? "No" : "Not Provided")}'),
-                            Text(
-                                'Food Selling Type: ${formaP.food_sell_types ?? 'Not Provided'}'),
-                          ],
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 20),
-                    // Pricing Section
-                    Text(
-                      'Pricing Details:',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                    ),
-                    SizedBox(height: 10),
-                    Container(
-                      padding: EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey[300]!, width: 1),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Total Price
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('Original Total Price:',
-                                  style: TextStyle(fontSize: 16)),
-                              Text(
-                                'RM${chkProis.toStringAsFixed(2)}',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color:
-                                      finProis > 0 ? Colors.grey : Colors.black,
-                                  decoration: finProis > 0
-                                      ? TextDecoration.lineThrough
-                                      : null,
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 8),
-                          // Discount Reduction (if any)
-                          if (discountReduction > 0)
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text('Discount Reduction:',
-                                    style: TextStyle(
-                                        fontSize: 16, color: Colors.red)),
+                                Icon(Icons.receipt_long, color: Colors.purple),
+                                SizedBox(width: 8),
                                 Text(
-                                  '- RM${discountReduction.toStringAsFixed(2)}',
+                                  'PRICE BREAKDOWN',
                                   style: TextStyle(
-                                      fontSize: 16, color: Colors.red),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16,
+                                    color: Colors.purple[800],
+                                  ),
                                 ),
                               ],
                             ),
-                          SizedBox(height: 8),
-                          // Final Price
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Final Price:',
-                                style: TextStyle(
+                            SizedBox(height: 20),
+                            _buildInfoRow(
+                                'Subtotal', 'RM${chkProis.toStringAsFixed(2)}'),
+                            if (_discountApplied) ...[
+                              SizedBox(height: 8),
+                              _buildInfoRow('Discount',
+                                  '- RM${discountReduction.toStringAsFixed(2)}'),
+                            ],
+                            Divider(height: 30, thickness: 1),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Total Amount',
+                                  style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.green),
-                              ),
-                              Text(
-                                'RM${(finProis > 0 ? finProis : chkProis).toStringAsFixed(2)}',
-                                style: TextStyle(
-                                    fontSize: 18,
+                                    color: Colors.grey[900],
+                                  ),
+                                ),
+                                Text(
+                                  'RM${finalPrice.toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    fontSize: 24,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.green),
+                                    color: Colors.green[700],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    SizedBox(height: 20),
+
+                    // Discount Section
+                    Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.local_offer_outlined,
+                                    color: Colors.orange),
+                                SizedBox(width: 8),
+                                Text(
+                                  'APPLY DISCOUNT',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16,
+                                    color: Colors.orange[800],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: dscountCtrl,
+                                    textCapitalization:
+                                        TextCapitalization.characters,
+                                    decoration: InputDecoration(
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                            color: Colors.grey[300]!),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                            color: Colors.grey[300]!),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide:
+                                            BorderSide(color: Colors.blue),
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      contentPadding: EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 14),
+                                      hintText: 'Enter discount code',
+                                      prefixIcon: Icon(
+                                          Icons.confirmation_number_outlined),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 12),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.orange,
+                                        Colors.deepOrange
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: ElevatedButton(
+                                    onPressed: () => appDscount(chkProis),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.transparent,
+                                      shadowColor: Colors.transparent,
+                                      padding: EdgeInsets.symmetric(
+                                          horizontal: 24, vertical: 14),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'APPLY',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (_discountApplied) ...[
+                              SizedBox(height: 12),
+                              Container(
+                                padding: EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.green[50],
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.green[100]!),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.check_circle,
+                                        color: Colors.green, size: 20),
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Discount applied! You saved RM${discountReduction.toStringAsFixed(2)}',
+                                        style: TextStyle(
+                                          color: Colors.green[800],
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
+
                     SizedBox(height: 20),
-                    // Discount Section
-                    Text(
-                      'Apply Discount:',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                    ),
-                    SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: dscountCtrl,
-                            textCapitalization: TextCapitalization.characters,
-                            decoration: InputDecoration(
-                              border: OutlineInputBorder(),
-                              labelText: 'Enter Discount Code',
-                              hintText: 'Enter Discount Code',
-                              contentPadding: EdgeInsets.symmetric(
-                                  vertical: 12, horizontal: 10),
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 10),
-                        ElevatedButton(
-                          onPressed: () => appDscount(chkProis),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.purple,
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: const Text('Apply',
-                              style: TextStyle(color: Colors.white)),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 20),
-                    // Selected Packages List
-                    Text(
-                      'Selected Packages:',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                    ),
-                    SizedBox(height: 10),
-                    if (ftP.selPax.isEmpty)
-                      Container(
-                        padding: EdgeInsets.all(20),
+
+                    // Selected Packages Card
+                    Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.amber[50],
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.amber[200]!),
-                        ),
-                        child: Center(
-                          child: Text(
-                            'No packages selected yet!',
-                            style: TextStyle(color: Colors.amber[800]),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Colors.white, Colors.grey[50]!],
                           ),
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                      )
-                    else
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: NeverScrollableScrollPhysics(),
-                        itemCount: ftP.selPax.length,
-                        itemBuilder: (context, index) {
-                          final pck = ftP.selPax[index];
-                          return Card(
-                            elevation: 2,
-                            margin: EdgeInsets.symmetric(vertical: 4),
-                            child: ListTile(
-                              title: Text('${pck['ft']} (${pck['pax']})',
+                        padding: EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.fastfood_outlined,
+                                    color: Colors.blue),
+                                SizedBox(width: 8),
+                                Text(
+                                  'SELECTED PACKAGES',
                                   style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold)),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                      'RM${pck['prois'].toStringAsFixed(2)} each'),
-                                  Text('Quantity: ${pck['qty'] ?? 1}',
-                                      style: TextStyle(fontSize: 12)),
-                                ],
-                              ),
-                              trailing: Text(
-                                'RM${((pck['prois'] ?? 0) * (pck['qty'] ?? 1)).toStringAsFixed(2)}',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.blue[700]),
-                              ),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16,
+                                    color: Colors.blue[800],
+                                  ),
+                                ),
+                                SizedBox(width: 8),
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue[50],
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    '${ftP.selPax.length} items',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.blue[800],
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          );
-                        },
+                            SizedBox(height: 16),
+                            if (ftP.selPax.isEmpty)
+                              Container(
+                                padding: EdgeInsets.all(24),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber[50],
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.amber[200]!),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Icon(Icons.warning_amber_outlined,
+                                        color: Colors.amber, size: 40),
+                                    SizedBox(height: 12),
+                                    Text(
+                                      'No packages selected',
+                                      style: TextStyle(
+                                        color: Colors.amber[800],
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      'Please go back and select at least one package',
+                                      style: TextStyle(
+                                        color: Colors.amber[600],
+                                        fontSize: 12,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else
+                              Column(
+                                children:
+                                    ftP.selPax.asMap().entries.map((entry) {
+                                  final index = entry.key;
+                                  final pck = entry.value;
+                                  final subtotal =
+                                      ((pck['prois'] ?? 0) * (pck['qty'] ?? 1));
+
+                                  return Container(
+                                    margin: EdgeInsets.only(bottom: 12),
+                                    padding: EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border:
+                                          Border.all(color: Colors.grey[200]!),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black12,
+                                          blurRadius: 2,
+                                          offset: Offset(0, 1),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 40,
+                                          height: 40,
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue[100],
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: Text(
+                                            '${index + 1}',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.blue[800],
+                                            ),
+                                          ),
+                                        ),
+                                        SizedBox(width: 16),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                '${pck['ft'] ?? 'Unknown'}',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 15,
+                                                  color: Colors.grey[900],
+                                                ),
+                                              ),
+                                              SizedBox(height: 4),
+                                              Text(
+                                                '${pck['pax'] ?? 'Unknown'} Package',
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: Colors.grey[600],
+                                                ),
+                                              ),
+                                              SizedBox(height: 4),
+                                              Text(
+                                                'RM${(pck['prois'] ?? 0).toStringAsFixed(2)} each × ${pck['qty'] ?? 1}',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey[500],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        SizedBox(width: 16),
+                                        Text(
+                                          'RM${subtotal.toStringAsFixed(2)}',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                            color: Colors.green[700],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                          ],
+                        ),
                       ),
+                    ),
+
+                    SizedBox(height: 40), // Extra padding at bottom
                   ],
                 ),
               ),
             ),
           ),
+
+          // Bottom Action Bar - FIXED VERSION
           Container(
-            padding: EdgeInsets.all(16),
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: Colors.white,
-              border: Border(top: BorderSide(color: Colors.grey[300]!)),
+              border: Border(top: BorderSide(color: Colors.grey[200]!)),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black12,
-                  blurRadius: 4,
+                  blurRadius: 8,
                   offset: Offset(0, -2),
                 ),
               ],
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
+            child: SafeArea(
+              top: false,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Total Amount',
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 12,
                           color: Colors.grey[600],
                         ),
                       ),
                       Text(
-                        'RM${(finProis > 0 ? finProis : chkProis).toStringAsFixed(2)}',
+                        'RM${finalPrice.toStringAsFixed(2)}',
                         style: TextStyle(
-                          fontSize: 24,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: Colors.green[700],
                         ),
                       ),
                     ],
                   ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _isSaving ? null : saveBooking,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                  Container(
+                    width: 160, // Fixed width to prevent overflow
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.green[600]!, Colors.green[800]!],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.green.withOpacity(0.3),
+                          blurRadius: 6,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
                     ),
-                    child: _isSaving
-                        ? SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation(Colors.white),
+                    child: ElevatedButton(
+                      onPressed: _isSaving ? null : saveBooking,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: _isSaving
+                          ? SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                valueColor:
+                                    AlwaysStoppedAnimation(Colors.white),
+                              ),
+                            )
+                          : FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'Confirm Booking',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          )
-                        : Text(
-                            'Confirm Booking',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

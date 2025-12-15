@@ -27,6 +27,19 @@ class FTSelectState extends State<FTSelect> {
 
   bool visSht = false;
 
+  @override
+  void initState() {
+    super.initState();
+
+    // Clear data when NOT in edit mode (i.e., creating new booking)
+    if (!widget.isEditMode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ftPDat = Provider.of<FTPDat>(context, listen: false);
+        ftPDat.clrPax(); // Clear previous selections
+      });
+    }
+  }
+
   bool fillBook() {
     final ftPDat = Provider.of<FTPDat>(context, listen: false);
     return ftPDat.hasPax();
